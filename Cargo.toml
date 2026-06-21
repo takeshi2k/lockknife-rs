@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+# All crates remain workspace members so `lockknife-core` (exploit/network/pcap/
+# gesture/crypto-wallet/intel/yara — deferred/sidecar scope) and `lockknife-tui`
+# (the PyO3-bound legacy hybrid TUI) stay buildable via `cargo build -p <crate>`
+# and stay in CI's radar, without being part of the default Rust-first ship.
+members = ["lockknife-cli-rs", "lockknife-core", "lockknife-tui"]
+default-members = ["lockknife-cli-rs"]

@@ -83,18 +83,14 @@ pub fn dispatch_apk(ctx: &AppContext, command: ApkCommand) -> Result<()> {
 
             // Resolve the scan target:
             // 1. If --apk is provided, use it directly (local file).
-            // 2. If --serial is provided, pull the base APK from device and use that.
+            // 2. If --serial is provided, defer with explicit error (future enhancement).
             // 3. Otherwise, use --target (fallback positional argument).
             // 4. Error if none are provided.
             let scan_target = if let Some(apk_path) = apk {
                 apk_path
-            } else if let Some(serial_val) = serial {
-                // Pull base APK from device; use a temporary location.
-                // Query the app's package name from serial info or require explicit package name.
-                // For now, this requires --apk to be provided if --serial is used without --package.
-                // In a future enhancement, we could auto-discover packages.
+            } else if serial.is_some() {
                 return Err(crate::app::LockKnifeError::message(
-                    "apk scan --serial requires identifying the package; use --apk with a local APK for now or provide --package"
+                    "apk scan --serial is deferred; provide --apk with a local APK file instead"
                 ));
             } else if let Some(target_path) = target {
                 target_path

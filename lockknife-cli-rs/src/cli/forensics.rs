@@ -24,7 +24,18 @@ pub fn dispatch_forensics(ctx: &AppContext, command: ForensicsCommand) -> Result
                 .unwrap_or_else(|| session.output_path("derived", "snapshot"));
             fs::create_dir_all(&output_dir)?;
             let mut results = Vec::new();
-            for remote in paths {
+
+            // Use provided paths, or fall back to default forensics paths if none given.
+            let snapshot_paths = if paths.is_empty() {
+                default_snapshot_paths()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+            } else {
+                paths
+            };
+
+            for remote in snapshot_paths {
                 let local = output_dir.join(
                     remote
                         .trim_start_matches('/')
@@ -142,4 +153,18 @@ pub fn dispatch_forensics(ctx: &AppContext, command: ForensicsCommand) -> Result
             Ok(())
         }
     }
+}
+
+/// Default forensics paths to snapshot if --path is not specified.
+/// These are common locations for forensics artifacts and artifacts recovery.
+fn default_snapshot_paths() -> &'static [&'static str] {
+    &[
+        "/data/user_de/0/com.android.providers.telephony/databases/mmssms.db",
+        "/data/data/com.android.providers.contacts/databases/contacts2.db",
+        "/data/data/com.android.providers.contacts/databases/calllog.db",
+        "/data/data/com.android.chrome/app_chrome/Default/History",
+        "/data/data/com.whatsapp/databases/msgstore.db",
+        "/sdcard/DCIM",
+        "/sdcard/Download",
+    ]
 }

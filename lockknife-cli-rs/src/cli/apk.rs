@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::app::{deferred_feature, AppContext, Result};
 use crate::case::CaseSession;
 use crate::cli::ApkCommand;
@@ -6,7 +8,7 @@ use crate::modules::apk::{
 };
 use crate::modules::{resolve_output_path, write_structured};
 
-pub fn dispatch_apk(_ctx: &AppContext, command: ApkCommand) -> Result<()> {
+pub fn dispatch_apk(ctx: &AppContext, command: ApkCommand) -> Result<()> {
     match command {
         ApkCommand::Decompile {
             apk_path,
@@ -70,7 +72,7 @@ pub fn dispatch_apk(_ctx: &AppContext, command: ApkCommand) -> Result<()> {
         }
         ApkCommand::Scan {
             yara,
-            serial: _serial,
+            serial,
             target,
             apk,
             io,
@@ -78,14 +80,28 @@ pub fn dispatch_apk(_ctx: &AppContext, command: ApkCommand) -> Result<()> {
             if yara.is_some() {
                 return Err(deferred_feature("yara-rule-scan"));
             }
-            // NOTE: --serial (pull-then-scan an installed package straight from a
-            // connected device) is accepted for forward CLI compatibility but not
-            // wired yet; --apk/target (local file) is the supported path this phase.
-            let scan_target = apk
-                .or(target)
-                .ok_or_else(|| crate::app::LockKnifeError::message("provide --apk or --target"))?;
+
+            // Resolve the scan target:
+            // 1. If --apk is provided, use it directly (local file).
+            // 2. If --serial is provided, defer with explicit error (future enhancement).
+            // 3. Otherwise, use --target (fallback positional argument).
+            // 4. Error if none are provided.
+            let scan_target = if let Some(apk_path) = apk {
+                apk_path
+            } else if serial.is_some() {
+                return Err(crate::app::LockKnifeError::message(
+                    "apk scan --serial is deferred; provide --apk with a local APK file instead"
+                ));
+            } else if let Some(target_path) = target {
+                target_path
+            } else {
+                return Err(crate::app::LockKnifeError::message(
+                    "provide --apk or --target"
+                ));
+            };
+
             let payload = if scan_target.extension().and_then(|value| value.to_str()) == Some("apk") {
-                serde_json::to_value(analyze_apk(&scan_target)?)?
+                serde_json::to_value(analyze_apk(&scan_target))?
             } else {
                 scan_file_for_patterns(
                     &scan_target,

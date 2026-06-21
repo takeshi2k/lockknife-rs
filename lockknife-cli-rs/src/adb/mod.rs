@@ -73,6 +73,33 @@ impl AdbClient {
         }
     }
 
+    /// Resolve the installed package path via `pm path <package>`.
+    /// Returns the full path to the APK on the device (e.g., /data/app/.../base.apk).
+    pub fn pm_path(&self, serial: &str, package: &str) -> Result<String> {
+        let output = self.shell(serial, &["pm".to_string(), "path".to_string(), package.to_string()])?;
+        // Output is typically "package:/data/app/..."
+        output
+            .strip_prefix("package:")
+            .map(|s| s.trim().to_string())
+            .ok_or_else(|| LockKnifeError::message(format!("pm path returned unexpected format: {}", output)))
+    }
+
+    /// List all installed packages on the device.
+    /// Returns a vector of package names (e.g., ["com.android.chrome", "com.whatsapp", ...]).
+    pub fn pm_list_packages(&self, serial: &str) -> Result<Vec<String>> {
+        let output = self.shell(serial, &["pm".to_string(), "list".to_string(), "packages".to_string()])?;
+        Ok(output
+            .lines()
+            .filter_map(|line| line.strip_prefix("package:").map(|s| s.to_string()))
+            .collect())
+    }
+
+    /// Find and return the path to an installed package by name.
+    /// Wrapper around pm_path for convenience; returns the device path to the APK.
+    pub fn pm_get_package_by_name(&self, serial: &str, package: &str) -> Result<String> {
+        self.pm_path(serial, package)
+    }
+
     fn run<const N: usize>(&self, args: [&str; N]) -> Result<String> {
         self.run_owned(args.iter().map(|item| item.to_string()).collect())
     }

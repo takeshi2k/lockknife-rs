@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::PathBuf;
+
 use crate::app::{deferred_feature, AppContext, Result};
 use crate::case::CaseSession;
 use crate::cli::SecurityCommand;
@@ -68,14 +71,64 @@ pub fn dispatch_security(ctx: &AppContext, command: SecurityCommand) -> Result<(
             println!("{}", serde_json::to_string_pretty(&payload)?);
             Ok(())
         }
-        SecurityCommand::AttackSurface { apk, io, .. } => {
-            let apk =
-                apk.ok_or_else(|| crate::app::LockKnifeError::message("provide --apk for attack-surface"))?;
-            let payload = attack_surface_from_apk(&apk)?;
+        SecurityCommand::AttackSurface {
+            apk,
+            io,
+            package,
+            serial,
+            artifacts,
+        } => {
+            // Resolve the APK to analyze:
+            // 1. If --apk is provided, use it directly (local file).
+            // 2. If --package and --serial are provided, pull APK from device.
+            // 3. If --artifacts is provided, use OWASP mapping on artifacts (not APK analysis).
+            // 4. Error if none are sufficient.
+
+            let apk_to_analyze = if let Some(apk_path) = apk {
+                apk_path
+            } else if let (Some(pkg), Some(ser)) = (package.as_ref(), serial.as_ref()) {
+                // Pull the APK from the device for the given package.
+                let remote_path = ctx.services.adb.pm_get_package_by_name(ser, pkg)?;
+                let temp_dir = std::env::temp_dir();
+                let temp_apk = temp_dir.join(format!("{}.apk", pkg));
+                ctx.services.adb.pull(ser, &remote_path, &temp_apk)?;
+                temp_apk
+            } else if artifacts.is_some() {
+                // If artifacts file is provided, use OWASP mapping instead of APK analysis.
+                let payload = map_owasp(artifacts.as_ref().unwrap())?;
+                let mut session = CaseSession::from_case_or_output(io.case_dir, io.output.clone())?;
+                let output = resolve_output_path(&session, io.output, "derived", "attack_surface.json");
+                write_structured(
+                    &mut session,
+                    &output,
+                    &payload,
+                    "security-attack-surface",
+                    "security attack-surface",
+                )?;
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+                return Ok(());
+            } else {
+                return Err(crate::app::LockKnifeError::message(
+                    "provide --apk (local file), --package with --serial (pull from device), or --artifacts"
+                ));
+            };
+
+            let payload = attack_surface_from_apk(&apk_to_analyze)?;
             let mut session = CaseSession::from_case_or_output(io.case_dir, io.output.clone())?;
             let output = resolve_output_path(&session, io.output, "derived", "attack_surface.json");
-            write_structured(&mut session, &output, &payload, "security-attack-surface", "security attack-surface")?;
+            write_structured(
+                &mut session,
+                &output,
+                &payload,
+                "security-attack-surface",
+                "security attack-surface",
+            )?;
             println!("{}", serde_json::to_string_pretty(&payload)?);
+
+            // Clean up temporary APK if it was pulled from device.
+            if package.is_some() && serial.is_some() && apk.is_none() {
+                let _ = fs::remove_file(&apk_to_analyze);
+            }
             Ok(())
         }
         SecurityCommand::Owasp { artifacts, io } => {

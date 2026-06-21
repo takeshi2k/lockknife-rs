@@ -1,0 +1,8 @@
+password
+Password
+password1
+hunter2
+secret
+secret1
+admin
+letmein

@@ -1,0 +1,14 @@
+log_level = "INFO"
+log_format = "console"
+adb_path = "adb"
+
+# Optional: set this when you want case manifests, reports, and derived
+# artifacts written under a fixed root.
+# case_root = "/path/to/cases"
+
+# Optional: external signing key source for custody/report workflows.
+# signing_key_source = "env:LOCKKNIFE_SIGNING_KEY"
+
+# Enforced by the Rust-first migration policy in this phase.
+disable_frida = true
+disable_pdf_reports = true

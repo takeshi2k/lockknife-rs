@@ -1,0 +1,13 @@
+case-demo/
+├── manifest.json
+├── derived/
+│   ├── crack_password_rules.json
+│   └── ...
+├── reports/
+│   ├── integrity.txt
+│   └── ...
+└── logs/
+
+out/
+├── crack_password.txt
+└── crack_pin.json

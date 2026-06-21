@@ -69,6 +69,62 @@ pub fn run_extraction(
     }))
 }
 
+/// Pull and extract data from an installed package by name.
+/// Resolves the package path via `pm path <package>` and pulls it to a local directory.
+pub fn run_extraction_by_package(
+    adb: &AdbClient,
+    serial: &str,
+    package: &str,
+    case_dir: Option<PathBuf>,
+    output: Option<PathBuf>,
+) -> Result<serde_json::Value> {
+    let mut session = CaseSession::from_case_or_output(case_dir, output.clone())?;
+    let root = output.unwrap_or_else(|| session.output_path("derived", &format!("extract-{package}")));
+    fs::create_dir_all(&root)?;
+
+    // Resolve the package path on device
+    let remote_path = adb.pm_get_package_by_name(serial, package)?;
+    let safe = remote_path
+        .trim_start_matches('/')
+        .replace('/', "_")
+        .replace(':', "_");
+    let local = root.join(safe);
+
+    let status = match adb.pull(serial, &remote_path, &local) {
+        Ok(detail) => {
+            if let Some(artifact) = session.register_path(
+                &local,
+                format!("extract-package-{package}"),
+                format!("extract {package}"),
+                serde_json::json!({ "package": package, "remote_path": remote_path }),
+            )? {
+                session.append_custody(&artifact, "pull", serial)?;
+            }
+            PullResult {
+                remote_path,
+                local_path: local.display().to_string(),
+                status: "ok".to_string(),
+                detail,
+            }
+        }
+        Err(err) => PullResult {
+            remote_path,
+            local_path: local.display().to_string(),
+            status: "error".to_string(),
+            detail: err.to_string(),
+        },
+    };
+
+    Ok(serde_json::json!({
+        "module": "extraction",
+        "kind": "package",
+        "package": package,
+        "serial": serial,
+        "output_root": root,
+        "result": status,
+    }))
+}
+
 fn remote_paths(kind: &str) -> &'static [&'static str] {
     match kind {
         "sms" => &[

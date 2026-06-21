@@ -202,6 +202,7 @@ pub enum ExtractCommand {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum ForensicsCommand {
+    /// Snapshot device artifacts. If no --path is specified, defaults to common forensics paths.
     Snapshot {
         serial: String,
         #[arg(long, default_value_t = false)]
@@ -334,15 +335,17 @@ pub enum SecurityCommand {
         #[command(flatten)]
         io: CaseOutputArgs,
     },
+    /// Attack surface analysis from APK, artifacts, or device package.
+    /// Accepts one of: --apk (local file), --package + --serial (pull from device), or --artifacts.
     #[command(name = "attack-surface")]
     AttackSurface {
-        #[arg(long)]
+        #[arg(long, help = "Package name on connected device (requires --serial)")]
         package: Option<String>,
-        #[arg(long)]
+        #[arg(long, help = "Serial of connected device (requires --package)")]
         serial: Option<String>,
-        #[arg(long)]
+        #[arg(long, help = "Local APK file path")]
         apk: Option<PathBuf>,
-        #[arg(long)]
+        #[arg(long, help = "Pre-extracted artifacts JSON")]
         artifacts: Option<PathBuf>,
         #[command(flatten)]
         io: CaseOutputArgs,
@@ -378,14 +381,16 @@ pub enum ApkCommand {
         #[command(flatten)]
         io: CaseOutputArgs,
     },
+    /// Scan APK or binary for patterns. Supports local file (--apk/--target) paths.
+    /// Note: --serial support is deferred pending package resolution improvements.
     Scan {
         #[arg(long)]
         yara: Option<PathBuf>,
-        #[arg(long)]
+        #[arg(long, help = "(Deferred) Serial of connected device")]
         serial: Option<String>,
         #[arg(long)]
         target: Option<PathBuf>,
-        #[arg(long)]
+        #[arg(long, help = "Local APK file path")]
         apk: Option<PathBuf>,
         #[command(flatten)]
         io: CaseOutputArgs,

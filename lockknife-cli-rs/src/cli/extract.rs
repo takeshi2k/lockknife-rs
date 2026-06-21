@@ -1,6 +1,6 @@
 use crate::app::{AppContext, Result};
 use crate::cli::ExtractCommand;
-use crate::modules::extraction::run_extraction;
+use crate::modules::extraction::{run_extraction, run_extraction_by_package};
 
 pub fn dispatch_extract(ctx: &AppContext, command: ExtractCommand) -> Result<()> {
     let (kind, args) = match command {
